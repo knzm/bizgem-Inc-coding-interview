@@ -1,0 +1,20 @@
+[
+{
+  "model": "api.company",
+  "pk": "ab06a643-1ea4-4032-82c8-da77c5c41ef3",
+  "fields": {
+    "name": "B社",
+    "created_at": "2026-02-08T08:27:45.500Z",
+    "updated_at": "2026-02-08T08:27:45.500Z"
+  }
+},
+{
+  "model": "api.company",
+  "pk": "c66d7482-3345-4ef5-94a1-392d94d5cb4c",
+  "fields": {
+    "name": "A社",
+    "created_at": "2026-02-08T08:27:41.927Z",
+    "updated_at": "2026-02-08T08:27:41.927Z"
+  }
+}
+]
