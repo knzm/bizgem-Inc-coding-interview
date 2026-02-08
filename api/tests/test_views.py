@@ -47,11 +47,84 @@ class CategoryViewTests(APITestCase):
         self.assertEqual(res.data["name"], self.root_category_a.name)
         self.assertEqual(str(res.data["company"]), str(self.company_a.id))
 
-    def test_create(self):
-        pass
+    def test_create_ok_parent_null(self):
+        payload = {
+            "company": str(self.company_a.id),
+            "name": "新規カテゴリ",
+            "parent_category": None,
+        }
+        res = self.client.post('/api/categories/', payload, format="json")
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
 
-    def test_update(self):
-        pass
+        created_id = res.data["id"]
+        obj = Category.objects.get(id=created_id)
+        self.assertEqual(obj.company_id, self.company_a.id)
+        self.assertEqual(obj.name, "新規カテゴリ")
+        self.assertIsNone(obj.parent_category)
 
-    def test_destroy(self):
-        pass
+    def test_create_ok_parent_same_company(self):
+        payload = {
+            "company": str(self.company_a.id),
+            "name": "A社の子カテゴリ",
+            "parent_category": str(self.root_category_a.id),
+        }
+        res = self.client.post('/api/categories/', payload, format="json")
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+
+        obj = Category.objects.get(id=res.data["id"])
+        self.assertEqual(obj.parent_category_id, self.root_category_a.id)
+
+    def test_create_ng_parent_different_company(self):
+        payload = {
+            "company": str(self.company_a.id),
+            "name": "他社親はNG",
+            "parent_category": str(self.root_category_b.id),  # B社のカテゴリ
+        }
+        res = self.client.post('/api/categories/', payload, format="json")
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("parent_category", res.data)
+
+    def test_create_ng_unique_company_name_duplicate(self):
+        payload = {
+            "company": str(self.company_a.id),
+            "name": self.root_category_a.name,
+            "parent_category": None,
+        }
+        res = self.client.post('/api/categories/', payload, format="json")
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("non_field_errors", res.data)
+
+    def test_update_ok(self):
+        url = f'/api/categories/{self.child_category_a.id}/'
+        payload = {"name": "子A(更新)"}
+        res = self.client.patch(url, payload, format="json")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+
+        self.child_category_a.refresh_from_db()
+        self.assertEqual(self.child_category_a.name, "子A(更新)")
+
+    def test_update_ng_parent_is_self(self):
+        url = f'/api/categories/{self.child_category_a.id}/'
+        payload = {
+            "parent_category": str(self.child_category_a.id),  # 自分を親に
+        }
+        res = self.client.patch(url, payload, format="json")
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("parent_category", res.data)
+
+    def test_delete_ok(self):
+        url = f'/api/categories/{self.child_category_a.id}/'
+        res = self.client.delete(url)
+        self.assertEqual(res.status_code, status.HTTP_204_NO_CONTENT)
+
+        self.assertFalse(Category.objects.filter(id=self.child_category_a.id).exists())
+
+    def test_delete_ng_with_children(self):
+        url = f'/api/categories/{self.root_category_a.id}/'
+        res = self.client.delete(url)
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+
+        self.assertIn("detail", res.data)
+
+        self.assertTrue(Category.objects.filter(id=self.root_category_a.id).exists())
+        self.assertTrue(Category.objects.filter(id=self.child_category_a.id).exists())
